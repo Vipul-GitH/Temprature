@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Room Temperatures</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" />
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; background: #f8fafc; color: #0f172a; }
+    .card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 14px; box-shadow: 0 16px 40px rgba(15,23,42,0.08); }
+    .panel { background: #f8fafc; border: 1px solid #e2e8f0; }
+    .badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 999px; font-weight: 700; font-size: 0.85rem; }
+    .badge-inrange { background: #d1fae5; color: #0f5132; border: 1px solid #6ee7b7; }
+    .badge-oor { background: #fee2e2; color: #842029; border: 1px solid #fca5a5; }
+    .badge-muted { background: #e2e8f0; color: #475569; border: 1px solid #cbd5e1; }
+    .crazy-bg {
+      background: linear-gradient(135deg, #0f172a, #0ea5e9, #a855f7);
+      background-size: 400% 400%;
+      animation: pulseGradient 12s ease infinite;
+      border-radius: 20px;
+      padding: 24px;
+      color: white;
+      position: relative;
+      overflow: hidden;
+    }
+    .crazy-bg::after {
+      content: '';
+      position: absolute;
+      inset: -60% -20% auto;
+      height: 220px;
+      background: radial-gradient(circle, rgba(255,255,255,0.35) 0%, transparent 60%);
+      animation: floatGlow 8s ease-in-out infinite;
+    }
+    @keyframes pulseGradient {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    @keyframes floatGlow {
+      0% { transform: translateY(0px); opacity: 0.7; }
+      50% { transform: translateY(-20px); opacity: 0.4; }
+      100% { transform: translateY(0px); opacity: 0.7; }
+    }
+    .pulse-card {
+      position: relative;
+      overflow: hidden;
+      border-radius: 18px;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(7, 175, 218, 0.6));
+      border: 1px solid rgba(255,255,255,0.2);
+      transition: transform .4s ease, box-shadow .4s ease;
+      padding: 1rem;
+      color: white;
+    }
+    .pulse-card::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 30% 20%, rgba(255,255,255,0.25), transparent 35%);
+      opacity: 0;
+      transition: opacity .4s ease;
+    }
+    .pulse-card.active {
+      transform: translateY(-6px) scale(1.01);
+      box-shadow: 0 20px 40px rgba(0,0,0,0.25);
+    }
+    .pulse-card.active::after {
+      opacity: 1;
+    }
+    .glow-bar {
+      height: 8px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(14,165,233,0.8), rgba(168,85,247,0.9));
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 space-y-6">
+    <nav class="flex items-center justify-between bg-white border border-slate-200 rounded-xl px-4 py-3 shadow-sm">
+      <div class="flex items-center gap-3">
+        <div id="secret-toggle" class="h-10 w-10 rounded-lg bg-gradient-to-br from-sky-400 to-emerald-400 flex items-center justify-center text-slate-900 font-extrabold cursor-pointer select-none">A°C</div>
+        <div>
+          <p class="text-xs uppercase tracking-wide text-slate-400">Enviro</p>
+          <p class="text-lg font-semibold text-slate-900">Room Temperature Monitor</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3 text-sm">
+        <a href="/temperature" class="px-3 py-2 rounded-lg bg-slate-900 text-white border border-slate-900">Dashboard</a>
+      </div>
+    </nav>
+    <header class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
+      <div>
+        <p class="text-sm text-slate-500">Guide: pick a room, read its row, click "View history".</p>
+        <h1 class="text-2xl font-bold text-slate-900">Room Temperature Dashboard</h1>
+      </div>
+      <div class="text-right text-sm text-slate-500">
+        <p>Last updated</p>
+        <p class="text-lg font-semibold text-sky-300">{{ summary.last_updated }}</p>
+      </div>
+    </header>
+
+    {% set temp_alerts = rooms | selectattr('temp_alert') | list %}
+    {% set sensor_alerts = rooms | selectattr('sensor_failure') | list %}
+    <section class="crazy-bg mt-6">
+      <div class="relative z-10 space-y-3">
+        <p class="text-xs tracking-[0.3em] uppercase text-white/70">Pulse</p>
+        <h1 class="text-3xl font-bold text-white">Environment Vibes</h1>
+        <p class="max-w-3xl text-sm text-white/80">Sensors are streaming data every few seconds. This gradient reflects the current stability—cool blues when all rooms are within range, and warmth when alerts spike.</p>
+        <div class="flex flex-wrap gap-2">
+          {% for room in rooms[:3] %}
+          <span class="px-3 py-2 rounded-full border border-white/30 bg-white/20 text-xs font-semibold shadow-sm">{{ room.name }}: {{ room.current }}&deg;C</span>
+          {% endfor %}
+        </div>
+        <div class="flex flex-wrap gap-3 text-xs text-white/80">
+          <span class="rounded-full border border-slate-200 px-3 py-1">Alerts {{ temp_alerts|length + sensor_alerts|length }}</span>
+          <span class="rounded-full border border-slate-200 px-3 py-1">Last sync {{ summary.last_updated }}</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="card p-5 space-y-5">
+      <div class="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <p class="text-sm uppercase tracking-widest text-slate-500">Pulse radar</p>
+          <h2 class="text-xl font-bold text-slate-900">Room heat signatures</h2>
+        </div>
+        <p class="text-xs text-slate-500">The highlighted card pulses to draw your eye to the most active sensor.</p>
+      </div>
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {% for room in rooms %}
+        {% set current_value = room.current if room.current is not none else 0 %}
+        {% set normalized = current_value + 25 %}
+        {% if normalized < 0 %}
+        {% set normalized = 0 %}
+        {% endif %}
+        {% if normalized > 100 %}
+        {% set normalized = 100 %}
+        {% endif %}
+        <div class="pulse-card" data-name="{{ room.name }}">
+          <div class="flex items-center justify-between text-xs uppercase tracking-[0.2em] text-slate-500">
+            <span>{{ room.range_type or 'room' }}</span>
+            <span>{{ current_value }}&deg;C</span>
+          </div>
+          <div class="text-base font-semibold text-slate-900">{{ room.name }}</div>
+          <div class="glow-bar" style="width: {{ normalized }}%;"></div>
+          <div class="text-xs text-slate-500">{{ room.status }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="card p-5 space-y-3">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p class="text-xs uppercase text-slate-500">Filter</p>
+          <h2 class="text-lg font-semibold text-slate-900">Choose a room (or see all)</h2>
+        </div>
+        <form method="get" action="/temperature" class="flex flex-wrap items-center gap-2 text-sm">
+          <label for="room" class="text-slate-500">Room</label>
+          <select id="room" name="room" class="border border-slate-300 rounded-lg px-3 py-2 bg-white text-slate-900 shadow-sm focus:border-sky-300">
+            <option value="">All rooms</option>
+            {% for name in available_rooms %}
+            <option value="{{ name }}" {% if room_filter and room_filter|lower == name|lower %}selected{% endif %}>{{ name }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="px-3 py-2 rounded-lg bg-sky-500 text-white font-semibold">Apply</button>
+          {% if room_filter %}
+          <a href="/temperature" class="text-slate-500 underline">Clear</a>
+          {% endif %}
+        </form>
+      </div>
+
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+        <div class="panel p-3 rounded-lg">
+          <p class="text-xs uppercase text-slate-500">Rooms</p>
+          <p class="text-xl font-bold text-slate-900">{{ summary.rooms }}</p>
+        </div>
+        <div class="panel p-3 rounded-lg">
+          <p class="text-xs uppercase text-slate-500">Average</p>
+          <p class="text-xl font-bold text-slate-900">{{ summary.avg_temp }}&deg;C</p>
+        </div>
+        <div class="panel p-3 rounded-lg">
+          <p class="text-xs uppercase text-slate-500">Range</p>
+          <p class="text-xl font-bold text-slate-900">{{ summary.min_temp }}&deg;C - {{ summary.max_temp }}&deg;C</p>
+        </div>
+        <div class="panel p-3 rounded-lg">
+          <p class="text-xs uppercase text-slate-500">Avg humidity</p>
+          <p class="text-xl font-bold text-slate-900">{{ summary.avg_humidity }}%</p>
+        </div>
+      </div>
+    </section>
+
+    {% set stale_rooms = rooms | selectattr('is_stale') | list %}
+    {% if stale_rooms %}
+    <section class="card p-5 space-y-3 border-l-4 border-amber-400 bg-amber-50 text-amber-900">
+      <div class="flex items-center gap-2">
+        <span class="text-xl">??</span>
+        <h3 class="text-lg font-semibold">Stale sensors</h3>
+      </div>
+      <p class="text-sm text-amber-900">No new readings have arrived within the last hour for:</p>
+      <ul class="list-disc list-inside text-sm space-y-1">
+        {% for room in stale_rooms %}
+        <li><span class="font-semibold text-amber-800">{{ room.name }}</span> – {{ room.stale_message }}</li>
+        {% endfor %}
+      </ul>
+    </section>
+    {% endif %}
+    {% if temp_alerts %}
+    <section class="card p-5 space-y-3 border-l-4 border-red-400 bg-red-50 text-red-900">
+      <div class="flex items-center gap-2">
+        <span class="text-xl">??</span>
+        <h3 class="text-lg font-semibold">Temperature alerts</h3>
+      </div>
+      <p class="text-sm text-red-900">Latest readings are outside the safe range:</p>
+      <ul class="list-disc list-inside text-sm space-y-1">
+        {% for room in temp_alerts %}
+        <li><span class="font-semibold text-red-800">{{ room.name }}</span> – {{ room.temp_alert_message }}</li>
+        {% endfor %}
+      </ul>
+    </section>
+    {% endif %}
+    <!-- {% if sensor_alerts %}
+    <section class="card p-5 space-y-3 border-l-4 border-orange-400 bg-orange-50 text-orange-900">
+      <div class="flex items-center gap-2">
+        <span class="text-xl">??</span>
+        <h3 class="text-lg font-semibold">Sensor alerts</h3>
+      </div>
+      <p class="text-sm text-orange-900">Sensors are reporting clearly invalid readings:</p>
+      <ul class="list-disc list-inside text-sm space-y-1">
+        {% for room in sensor_alerts %}
+        <li><span class="font-semibold text-orange-800">{{ room.name }}</span> – {{ room.sensor_alert_message }}</li>
+        {% endfor %}
+      </ul>
+    </section>
+    {% endif %} -->
+
+    <section class="card p-5 space-y-3">
+      <div>
+        <p class="text-xs uppercase tracking-widest text-slate-500">Rooms</p>
+        <h2 class="text-lg font-semibold text-slate-900">Available environments</h2>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-sm">
+          <thead>
+            <tr class="bg-slate-100 text-slate-700">
+              <th class="text-left px-4 py-3 font-semibold">Room</th>
+              <th class="text-left px-4 py-3 font-semibold">Current vs target</th>
+              <th class="text-left px-4 py-3 font-semibold">Status</th>
+              <th class="text-left px-4 py-3 font-semibold">Min / Max / Avg</th>
+              <th class="text-left px-4 py-3 font-semibold">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-200">
+            {% if not rooms %}
+            <tr><td colspan="7" class="px-4 py-6 text-center text-slate-500">No rooms found.</td></tr>
+            {% else %}
+            {% for room in rooms %}
+            <tr class="hover:bg-slate-100">
+              <td class="px-4 py-3">
+                <p class="font-semibold text-slate-900">{{ room.name }}</p>
+                <p class="text-slate-500 text-xs">{{ room.location }}</p>
+              </td>
+              <td class="px-4 py-3">
+                <p class="font-bold text-lg text-slate-900">{{ room.current }}&deg;C</p>
+                <p class="text-slate-500 text-xs">Type {{ room.range_label }} | Safe {{ room.safe_low }}&deg;C - {{ room.safe_high }}&deg;C</p>
+                <p class="text-slate-500 text-xs">Target {{ room.target }}&deg;C</p>
+                <p class="text-slate-500 text-xs">Humidity {{ room.humidity if room.humidity is not none else '-' }}%</p>
+              </td>
+              <td class="px-4 py-3"><span class="badge {{ room.badge }}">{{ room.status }}</span></td>
+              <td class="px-4 py-3 text-slate-600">
+                <p class="font-semibold">{{ room.min }}&deg;C - {{ room.max }}&deg;C</p>
+                <p class="text-slate-500 text-xs">Avg {{ room.avg }}&deg;C</p>
+              </td>
+              <td class="px-4 py-3">
+                <a href="/temperature/history/{{ room.encoded_name }}" class="px-3 py-2 rounded-lg bg-sky-500 text-white font-semibold">View history</a>
+              </td>
+            </tr>
+            {% endfor %}
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer class="text-slate-500 text-sm py-6 text-center border-t border-slate-200">
+      Summary synced {{ summary.last_updated.split(',')[0] if summary.last_updated else '' }}
+    </footer>
+  </div>
+
+  <div id="secret-panel" class="fixed inset-0 hidden items-center justify-center bg-slate-900/50 z-50">
+    <div class="bg-white rounded-xl shadow-xl border border-slate-200 w-full max-w-xl mx-4 p-5 space-y-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-xs uppercase tracking-widest text-slate-400">Hidden tools</p>
+          <h3 class="text-lg font-semibold text-slate-900">Dummy scheduler control</h3>
+        </div>
+        <button id="secret-close" class="px-3 py-1 rounded-lg border border-slate-200 text-slate-600">Close</button>
+      </div>
+      <div class="grid gap-3">
+        <label class="text-sm text-slate-500">Token</label>
+        <div class="flex flex-wrap gap-2">
+          <input id="secret-token" type="password" class="flex-1 min-w-[220px] border border-slate-300 rounded-lg px-3 py-2" placeholder="x-dummy-token" />
+          <button id="secret-save" class="px-3 py-2 rounded-lg bg-slate-900 text-white">Save</button>
+          <button id="secret-refresh" class="px-3 py-2 rounded-lg border border-slate-200 text-slate-700">Refresh</button>
+        </div>
+        <p id="secret-status" class="text-xs text-slate-500">Enter token and refresh.</p>
+      </div>
+      <div class="border-t border-slate-200 pt-4 space-y-3">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-semibold text-slate-900">Alert scheduler (room scan)</p>
+            <p class="text-xs text-slate-500">Enable/disable background alert scan.</p>
+          </div>
+          <label class="flex items-center gap-2 text-sm">
+            <input id="alert-toggle" type="checkbox" class="h-4 w-4" />
+            <span>Enabled</span>
+          </label>
+        </div>
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-semibold text-slate-900">Dummy scheduler (all tables)</p>
+            <p class="text-xs text-slate-500">Toggle global dummy inserts.</p>
+          </div>
+          <label class="flex items-center gap-2 text-sm">
+            <input id="global-toggle" type="checkbox" class="h-4 w-4" />
+            <span>Enabled</span>
+          </label>
+        </div>
+        <div>
+          <p class="text-sm font-semibold text-slate-900 mb-2">Per-table toggles</p>
+          <div id="table-toggles" class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const cards = Array.from(document.querySelectorAll('.pulse-card'));
+      if (!cards.length) return;
+      let idx = 0;
+      const highlight = () => {
+        cards.forEach((card, i) => card.classList.toggle('active', i === idx));
+        idx = (idx + 1) % cards.length;
+      };
+      highlight();
+      setInterval(highlight, 2600);
+    });
+  </script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const panel = document.getElementById('secret-panel');
+      const openBtn = document.getElementById('secret-toggle');
+      const closeBtn = document.getElementById('secret-close');
+      const tokenInput = document.getElementById('secret-token');
+      const saveBtn = document.getElementById('secret-save');
+      const refreshBtn = document.getElementById('secret-refresh');
+      const statusEl = document.getElementById('secret-status');
+      const alertToggle = document.getElementById('alert-toggle');
+      const globalToggle = document.getElementById('global-toggle');
+      const tableToggles = document.getElementById('table-toggles');
+
+      let clickCount = 0;
+      let clickTimer = null;
+      const reveal = () => {
+        panel.classList.remove('hidden');
+        panel.classList.add('flex');
+        const saved = localStorage.getItem('dummyToken') || '';
+        tokenInput.value = saved;
+      };
+      const hide = () => {
+        panel.classList.add('hidden');
+        panel.classList.remove('flex');
+      };
+
+      openBtn.addEventListener('click', () => {
+        clickCount += 1;
+        if (clickCount >= 5) {
+          clickCount = 0;
+          reveal();
+        }
+        if (clickTimer) clearTimeout(clickTimer);
+        clickTimer = setTimeout(() => {
+          clickCount = 0;
+        }, 800);
+      });
+      closeBtn.addEventListener('click', hide);
+      panel.addEventListener('click', (event) => {
+        if (event.target === panel) hide();
+      });
+
+      const getToken = () => tokenInput.value.trim();
+      const setStatus = (text, isError = false) => {
+        statusEl.textContent = text;
+        statusEl.className = `text-xs ${isError ? 'text-red-500' : 'text-slate-500'}`;
+      };
+
+      saveBtn.addEventListener('click', () => {
+        localStorage.setItem('dummyToken', getToken());
+        setStatus('Token saved. Click refresh.');
+      });
+
+      const apiFetch = async (url, options = {}) => {
+        const token = getToken();
+        const headers = {
+          'Content-Type': 'application/json',
+          'x-dummy-token': token,
+          ...(options.headers || {}),
+        };
+        const resp = await fetch(url, { ...options, headers });
+        return resp.json();
+      };
+
+      const renderTableToggles = (tables, flags) => {
+        tableToggles.innerHTML = '';
+        tables.forEach((table) => {
+          const isEnabled = flags && table in flags ? flags[table] : true;
+          const wrapper = document.createElement('label');
+          wrapper.className = 'flex items-center gap-2 border border-slate-200 rounded-lg px-3 py-2';
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.checked = Boolean(isEnabled);
+          checkbox.addEventListener('change', async () => {
+            const res = await apiFetch('/api/dummy/scheduler/table', {
+              method: 'POST',
+              body: JSON.stringify({ table, enabled: checkbox.checked }),
+            });
+            if (res.error) {
+              setStatus(res.error, true);
+              checkbox.checked = !checkbox.checked;
+              return;
+            }
+            setStatus('Table updated.');
+          });
+          const text = document.createElement('span');
+          text.textContent = table;
+          wrapper.appendChild(checkbox);
+          wrapper.appendChild(text);
+          tableToggles.appendChild(wrapper);
+        });
+      };
+
+      const refreshStatus = async () => {
+        if (!getToken()) {
+          setStatus('Token required.', true);
+          return;
+        }
+        const res = await apiFetch('/api/scheduler/status', { method: 'GET' });
+        if (res.error) {
+          setStatus(res.error, true);
+          return;
+        }
+        alertToggle.checked = Boolean(res.alert_enabled);
+        globalToggle.checked = Boolean(res.dummy_enabled);
+        renderTableToggles(res.tables || [], res.table_flags || {});
+        setStatus('Status loaded.');
+      };
+
+      refreshBtn.addEventListener('click', refreshStatus);
+      alertToggle.addEventListener('change', async () => {
+        const res = await apiFetch('/api/scheduler/alert/toggle', {
+          method: 'POST',
+          body: JSON.stringify({ enabled: alertToggle.checked }),
+        });
+        if (res.error) {
+          setStatus(res.error, true);
+          alertToggle.checked = !alertToggle.checked;
+          return;
+        }
+        setStatus(alertToggle.checked ? 'Alert scheduler enabled.' : 'Alert scheduler disabled.');
+      });
+
+      globalToggle.addEventListener('change', async () => {
+        const res = await apiFetch('/api/dummy/scheduler/toggle', {
+          method: 'POST',
+          body: JSON.stringify({ enabled: globalToggle.checked }),
+        });
+        if (res.error) {
+          setStatus(res.error, true);
+          globalToggle.checked = !globalToggle.checked;
+          return;
+        }
+        setStatus(globalToggle.checked ? 'Scheduler enabled.' : 'Scheduler disabled.');
+      });
+    });
+  </script>
+</body>
+</html>

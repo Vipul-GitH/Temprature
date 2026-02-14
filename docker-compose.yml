@@ -1,0 +1,23 @@
+services:
+  room-temperature-dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: room-temperature-dashboard:latest
+    ports:
+      - "3003:3003"
+    env_file:
+      - .env
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - default
+      - raiseit-ticket
+
+networks:
+  default:
+    name: temprature_default
+  raiseit-ticket:
+    external: true
+    name: raiseit-ticket_default

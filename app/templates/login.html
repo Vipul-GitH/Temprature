@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Infra HelpDesk Login</title>
+
+    <!-- Tailwind CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              brandBlue: "#074F74",
+              brandTeal: "#40C4A4",
+              brandText: "#01485E",
+            },
+          },
+        },
+      };
+    </script>
+
+    <!-- Minimal custom CSS for toast + suggestions -->
+    <link rel="stylesheet" href="/static/style.css" />
+
+    <!-- Extra styling for sexy suggestion dropdown -->
+    <style>
+      .autocomplete-wrapper {
+        position: relative;
+      }
+
+      .suggestion-box {
+        position: absolute;
+        inset-inline: 0;
+        top: 100%;
+        margin-top: 4px;
+        background: #ffffff;
+        border-radius: 0.75rem;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 10px 25px rgba(15, 23, 42, 0.12),
+          0 0 0 1px rgba(148, 163, 184, 0.25);
+        max-height: 260px;
+        overflow-y: auto;
+        padding: 4px;
+        z-index: 50;
+      }
+
+      .suggestion-box.hidden {
+        display: none;
+      }
+
+      .suggestion-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        border-radius: 0.6rem;
+        cursor: pointer;
+        font-size: 0.9rem;
+        color: #0f172a;
+        transition: background 0.15s ease, transform 0.1s ease,
+          box-shadow 0.15s ease;
+      }
+
+      .suggestion-item::before {
+        content: "";
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: radial-gradient(circle at 30% 30%, #40c4a4, #074f74);
+        opacity: 0.6;
+        flex-shrink: 0;
+      }
+
+      .suggestion-item:hover,
+      .suggestion-item.active {
+        background: linear-gradient(90deg, #ecfeff, #e0f2fe);
+        box-shadow: 0 1px 4px rgba(15, 23, 42, 0.12);
+        transform: translateX(2px);
+        color: #01485e;
+      }
+
+      /* Smooth scrollbar (just for the dropdown) */
+      .suggestion-box::-webkit-scrollbar {
+        width: 6px;
+      }
+      .suggestion-box::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .suggestion-box::-webkit-scrollbar-thumb {
+        background: #cbd5f5;
+        border-radius: 999px;
+      }
+      .suggestion-box::-webkit-scrollbar-thumb:hover {
+        background: #a5b4fc;
+      }
+    </style>
+  </head>
+
+  <body
+    class="app-bg text-slate-800 leading-relaxed"
+    data-error="{{ error or '' }}"
+    data-message="{{ message or '' }}"
+  >
+    <!-- PAGE WRAPPER -->
+    <div
+      class="relative min-h-screen flex items-center justify-center px-4 py-12 overflow-hidden"
+    >
+      <div class="absolute inset-0 pointer-events-none">
+        <div class="floating-dots"></div>
+        <div
+          class="absolute -left-12 top-10 h-64 w-64 rounded-full bg-brandTeal/20 blur-3xl"
+        ></div>
+        <div
+          class="absolute -right-10 -bottom-6 h-72 w-72 rounded-full bg-brandBlue/15 blur-3xl"
+        ></div>
+      </div>
+
+      <!-- LOGIN CARD -->
+      <div class="content-shell">
+        <div
+          class="relative w-full max-w-6xl grid lg:grid-cols-[0.95fr,1.05fr] gap-6 glass-card rounded-3xl p-6 md:p-10"
+        >
+        <!-- BRAND PANEL -->
+        <div
+          class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-brandBlue to-brandTeal text-white p-6 md:p-8 flex flex-col justify-between shadow-lg"
+        >
+          <div class="absolute inset-0 opacity-30">
+            <div class="floating-dots"></div>
+          </div>
+          <div class="relative z-10 space-y-5">
+            <div class="flex items-center gap-3">
+              <div
+                class="h-12 w-12 rounded-xl bg-white/15 border border-white/30 flex items-center justify-center shadow-inner"
+              >
+                <img
+                  src="/static/Logoicon.png"
+                  alt="Lab Logo"
+                  class="h-8 w-auto object-contain"
+                />
+              </div>
+              <div>
+                <p class="text-xs uppercase tracking-[0.25em] text-white/80">
+                  Infra HelpDesk
+                </p>
+                <h1 class="text-3xl md:text-4xl font-semibold leading-tight">
+                  Faster fixes for every workspace
+                </h1>
+              </div>
+            </div>
+            <p class="text-sm md:text-base text-white/85 leading-relaxed">
+              Log in to raise IT or infra tickets, track status, and collaborate
+              with the support team. Optimised for quick daily use on both
+              mobile and desktop.
+            </p>
+            <div class="grid grid-cols-2 gap-3 text-sm">
+              <div class="pill bg-white/10 text-white flex items-center gap-2">
+                <span class="h-2.5 w-2.5 rounded-full bg-emerald-300"></span>
+                <span>Live status updates</span>
+              </div>
+              <div class="pill bg-white/10 text-white flex items-center gap-2">
+                <span class="h-2.5 w-2.5 rounded-full bg-cyan-200"></span>
+                <span>SLA commitments</span>
+              </div>
+              <div class="pill bg-white/10 text-white flex items-center gap-2">
+                <span class="h-2.5 w-2.5 rounded-full bg-sky-200"></span>
+                <span>Photo evidence</span>
+              </div>
+              <div class="pill bg-white/10 text-white flex items-center gap-2">
+                <span class="h-2.5 w-2.5 rounded-full bg-amber-200"></span>
+                <span>Smart suggestions</span>
+              </div>
+            </div>
+          </div>
+          <div class="relative z-10 mt-6 text-xs text-white/80">
+            Powered by Dr. Bhasin's Lab • Secure internal access
+          </div>
+        </div>
+
+        <!-- FORM PANEL -->
+        <div
+          class="rounded-2xl bg-white border border-slate-200 shadow-inner p-6 md:p-8"
+        >
+          <div class="flex items-center justify-between mb-2">
+            <div>
+              <p class="text-xs uppercase tracking-[0.2em] text-slate-500">
+                Welcome back
+              </p>
+              <h2 class="text-2xl font-semibold text-brandText">
+                Log in to continue
+              </h2>
+            </div>
+            <div
+              class="hidden md:flex items-center gap-2 text-xs text-slate-500"
+            >
+              <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
+              <span>System online</span>
+            </div>
+          </div>
+
+          <div
+            class="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent mb-6"
+          ></div>
+
+          <!-- LOGIN FORM -->
+          <form method="post" action="/login" class="space-y-5">
+            <!-- Username -->
+            <div class="space-y-2">
+              <label
+                for="username"
+                class="text-base font-semibold text-slate-700"
+                >Your Name</label
+              >
+
+              <div class="autocomplete-wrapper">
+                <input
+                  type="text"
+                  id="username"
+                  name="username"
+                  autocomplete="off"
+                  required
+                  placeholder="Start typing to search your name"
+                  class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-base outline-none focus:border-brandTeal focus:ring-2 focus:ring-brandTeal/30"
+                />
+
+                <!-- Suggestion dropdown -->
+                <div id="suggestion-box" class="suggestion-box hidden"></div>
+              </div>
+
+              <p class="text-sm text-slate-600">
+                Auto-complete suggests names from the staff directory.
+              </p>
+            </div>
+
+            <!-- DOB (as hidden/password) -->
+            <div class="space-y-2">
+              <label for="dob" class="text-base font-semibold text-slate-700">
+                Date of Birth (DDMMYYYY)
+              </label>
+              <input
+                type="password"
+                id="dob"
+                name="dob"
+                required
+                maxlength="8"
+                placeholder="03092003"
+                inputmode="numeric"
+                autocomplete="off"
+                class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-base outline-none focus:border-brandTeal focus:ring-2 focus:ring-brandTeal/30 tracking-widest"
+              />
+              <p class="text-sm text-slate-600">
+                Example: 03092003 = 03/09/2003
+              </p>
+            </div>
+
+            <!-- SUBMIT BUTTON -->
+            <button
+              type="submit"
+              class="w-full mt-3 inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-brandTeal to-brandBlue px-4 py-3 text-base font-semibold text-white shadow-lg hover:shadow-xl hover:from-emerald-400 hover:to-brandBlue transition"
+            >
+              <span>Enter HelpDesk</span>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="h-4 w-4"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M5 12h14M13 6l6 6-6 6"
+                />
+              </svg>
+            </button>
+          </form>
+
+          <div class="text-center text-sm text-slate-500 mt-6">
+            Having trouble? Contact IT support desk.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast container -->
+    <div id="toast" class="toast">
+      <div id="toast-content"></div>
+    </div>
+
+    <!-- JS -->
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        const body = document.body;
+
+        // ===========================
+        // Username suggestions
+        // ===========================
+        const usernameInput = document.getElementById("username");
+        const suggestionBox = document.getElementById("suggestion-box");
+        let suggestions = [];
+        let selectedIndex = -1;
+        let timeoutId = null;
+
+        function showSuggestions(list) {
+          suggestionBox.innerHTML = "";
+
+          if (!list || list.length === 0) {
+            hideSuggestions();
+            return;
+          }
+
+          list.forEach((text) => {
+            const item = document.createElement("div");
+            item.className = "suggestion-item";
+            item.textContent = text;
+
+            item.addEventListener("click", () => {
+              usernameInput.value = text;
+              hideSuggestions();
+            });
+
+            suggestionBox.appendChild(item);
+          });
+
+          suggestionBox.classList.remove("hidden");
+          selectedIndex = -1;
+        }
+
+        function hideSuggestions() {
+          suggestionBox.classList.add("hidden");
+          suggestionBox.innerHTML = "";
+          selectedIndex = -1;
+        }
+
+        function updateActive(items) {
+          items.forEach((el) => el.classList.remove("active"));
+          if (selectedIndex >= 0 && selectedIndex < items.length) {
+            items[selectedIndex].classList.add("active");
+          }
+        }
+
+        usernameInput.addEventListener("input", () => {
+          const value = usernameInput.value.trim();
+
+          // Show from first letter
+          if (value.length < 1) {
+            hideSuggestions();
+            return;
+          }
+
+          if (timeoutId) clearTimeout(timeoutId);
+
+          timeoutId = setTimeout(() => {
+            fetch(`/user-suggestions?query=${encodeURIComponent(value)}`)
+              .then((response) => response.json())
+              .then((data) => {
+                suggestions = data.results || [];
+
+                // No auto-fill even if only one suggestion
+                showSuggestions(suggestions);
+              })
+              .catch((err) => {
+                console.error("Suggestion fetch error:", err);
+              });
+          }, 250);
+        });
+
+        usernameInput.addEventListener("keydown", (e) => {
+          const items = suggestionBox.querySelectorAll(".suggestion-item");
+
+          if (
+            suggestionBox.classList.contains("hidden") ||
+            items.length === 0
+          ) {
+            // No auto-pick when suggestion box is hidden
+            return;
+          }
+
+          if (e.key === "ArrowDown") {
+            selectedIndex = (selectedIndex + 1) % items.length;
+            updateActive(items);
+            e.preventDefault();
+          } else if (e.key === "ArrowUp") {
+            selectedIndex = (selectedIndex - 1 + items.length) % items.length;
+            updateActive(items);
+            e.preventDefault();
+          } else if (e.key === "Enter") {
+            // Enter will pick:
+            // - the only visible item if none highlighted
+            // - or the active one if user moved with arrows
+            if (selectedIndex === -1 && items.length === 1) {
+              usernameInput.value = items[0].textContent;
+              hideSuggestions();
+              return;
+            }
+            if (selectedIndex >= 0) {
+              usernameInput.value = items[selectedIndex].textContent;
+              hideSuggestions();
+            }
+          } else if (e.key === "Escape") {
+            hideSuggestions();
+          }
+        });
+
+        document.addEventListener("click", (e) => {
+          if (!suggestionBox.contains(e.target) && e.target !== usernameInput) {
+            hideSuggestions();
+          }
+        });
+
+        // ===========================
+        // Toasts
+        // ===========================
+        const toastEl = document.getElementById("toast");
+        const toastContentEl = document.getElementById("toast-content");
+
+        function showToast(message, type = "info") {
+          if (!message) return;
+
+          toastContentEl.textContent = message;
+          toastEl.className = "toast";
+          toastEl.classList.add("show");
+
+          if (type === "error") {
+            toastEl.classList.add("toast-error");
+          } else if (type === "success") {
+            toastEl.classList.add("toast-success");
+          } else {
+            toastEl.classList.add("toast-info");
+          }
+
+          setTimeout(() => {
+            toastEl.classList.remove("show");
+          }, 3000);
+        }
+
+        const errorMessage = body.dataset.error;
+        const successMessage = body.dataset.message;
+
+        if (errorMessage) showToast(errorMessage, "error");
+        else if (successMessage) showToast(successMessage, "success");
+      });
+    </script>
+  </body>
+</html>

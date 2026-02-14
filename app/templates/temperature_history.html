@@ -1,0 +1,421 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>{{ room.name }} History</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" />
+  <style>
+    :root {
+      color-scheme: light;
+    }
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: radial-gradient(circle at top, rgba(14, 165, 233, 0.12), transparent 45%) #eef2f7;
+      color: #0f172a;
+    }
+    .card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 18px;
+      box-shadow: 0 20px 60px rgba(15,23,42,0.12);
+    }
+    .glassy-nav {
+      background: rgba(255,255,255,0.92);
+      border: 1px solid #e5e7eb;
+      border-radius: 18px;
+      box-shadow: 0 20px 50px rgba(15,23,42,0.14);
+      backdrop-filter: blur(12px);
+    }
+    .filter-pill {
+      transition: transform 120ms ease, box-shadow 120ms ease;
+    }
+    .filter-pill:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px rgba(15,23,42,0.12);
+    }
+    .table-head th {
+      padding: 14px 18px;
+      letter-spacing: 0.02em;
+    }
+    .table-row td {
+      padding: 16px 18px;
+    }
+    .table-row:hover td {
+      background: #f8fafc;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 0.85rem;
+    }
+    .badge-stable { background: #dbeafe; color: #0c4a6e; border: 1px solid #93c5fd; }
+    .badge-warm { background: #fef3c7; color: #78350f; border: 1px solid #fcd34d; }
+    .badge-hot { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+    .badge-cool { background: #e0e7ff; color: #312e81; border: 1px solid #c7d2fe; }
+    .badge-cold { background: #d1fae5; color: #0f766e; border: 1px solid #6ee7b7; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+  <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4 space-y-4">
+    <nav class="flex items-center justify-between glassy-nav px-4 py-3">
+      <div class="flex items-center gap-3">
+        <div class="h-10 w-10 rounded-lg bg-gradient-to-br from-sky-400 to-emerald-400 flex items-center justify-center text-slate-900 font-extrabold">°C</div>
+        <div>
+          <p class="text-xs uppercase tracking-wide text-slate-400">Enviro</p>
+          <p class="text-lg font-semibold text-slate-900">{{ room.name }} History</p>
+        </div>
+      </div>
+      <a href="/temperature" class="px-3 py-2 rounded-lg bg-white text-slate-500 border border-slate-200 hover:border-slate-300">Back to dashboard</a>
+    </nav>
+    <!-- <header class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
+      <div>
+        <p class="text-sm text-slate-500">History view for {{ room.name }}</p>
+        <h1 class="text-2xl font-bold text-slate-900">{{ room.name }} - {{ room.location }}</h1>
+        <p class="text-slate-500 text-sm">Target {{ room.target }} degrees C - Current {{ room.current }} degrees C</p>
+      </div>
+    </header> -->
+
+    <section class="card p-5 space-y-4">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p class="text-xs uppercase text-slate-500">Filters</p>
+          <h2 class="text-lg font-semibold text-slate-900">History (newest first)</h2>
+          <p class="text-sm text-slate-500">Narrow by date, search, and control the page size.</p>
+        </div>
+        <form id="historyFilters" method="get" class="flex flex-wrap items-end gap-3 text-sm">
+          <div class="flex flex-wrap gap-2 items-center">
+            <label for="start" class="text-slate-500">Start</label>
+            <input type="date" id="start" name="start" value="{{ start.split('T')[0] if start else '' }}" class="border border-slate-300 rounded-lg px-3 py-2 bg-white text-slate-900 shadow-sm" />
+            <label for="end" class="text-slate-500">End</label>
+            <input type="date" id="end" name="end" value="{{ end.split('T')[0] if end else '' }}" class="border border-slate-300 rounded-lg px-3 py-2 bg-white text-slate-900 shadow-sm" />
+          </div>
+          <div class="flex flex-wrap gap-2 items-center">
+            <label for="search" class="text-slate-500">Search</label>
+            <input type="search" id="search" name="search" value="{{ search }}" placeholder="ID, time, temp" class="border border-slate-300 rounded-lg px-3 py-2 bg-white text-slate-900 shadow-sm w-40" />
+            <label for="per_page" class="text-slate-500">Rows</label>
+            <select id="per_page" name="per_page" class="border border-slate-300 rounded-lg px-3 py-2 bg-white text-slate-900 shadow-sm">
+              {% for option in [10,25,50,100,200] %}
+              <option value="{{ option }}" {% if per_page == option %}selected{% endif %}>{{ option }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <input type="hidden" name="page" id="history-page" value="{{ page }}">
+          <button type="submit" class="sr-only">Apply filters</button>
+          <div class="flex flex-wrap gap-2 mt-2 w-full text-xs text-slate-500">
+            <!-- <button type="button" id="btn-last24" class="px-3 py-1 rounded-lg bg-white text-slate-600 border border-slate-200 shadow-sm">Last 24h</button>
+            <button type="button" id="btn-today" class="px-3 py-1 rounded-lg bg-white text-slate-600 border border-slate-200 shadow-sm">Today</button> -->
+            <button type="button" id="btn-clear-dates" class="px-3 py-1 rounded-lg bg-white text-slate-600 border border-slate-200 filter-pill">Clear Filters </button>
+          </div>
+        </form>
+      </div>
+
+      <div class="border border-slate-200 rounded-lg overflow-auto max-h-[480px] bg-white shadow-sm">
+        <table class="min-w-full text-sm">
+          <thead class="table-head bg-slate-50 text-slate-700 sticky top-0">
+            <tr>
+              <!-- <th class="text-left px-4 py-3 font-semibold">ID</th> -->
+              <th class="text-left px-4 py-3 font-semibold">Date &amp; Time</th>
+              <th class="text-left px-4 py-3 font-semibold">Temp (degrees C)</th>
+              <th class="text-left px-4 py-3 font-semibold">Humidity</th>
+              <th class="text-left px-4 py-3 font-semibold">Delta vs target</th>
+            </tr>
+          </thead>
+          <tbody id="historyTableBody" class="divide-y divide-slate-200">
+            {% if not history %}
+            <tr><td colspan="5" class="px-4 py-4 text-center text-slate-500">No readings for this filter.</td></tr>
+            {% else %}
+            {% for point in history %}
+            <tr class="table-row hover:bg-slate-100">
+              <!-- <td class="px-4 py-3 text-slate-900">{{ point.id }}</td> -->
+              <td class="px-4 py-3 text-slate-900">{{ point.display_time if point.display_time else point.time }}</td>
+              <td class="px-4 py-3 font-semibold text-slate-900">{{ point.temp }} degrees C</td>
+              <td class="px-4 py-3 font-semibold text-slate-900">{{ point.humidity if point.humidity is not none else '-' }}%</td>
+              {% set delta = (point.temp - room.target) | round(1) %}
+              <td class="px-4 py-3">
+                {% if delta >= 1 %}
+                <span class="text-emerald-600">+{{ delta }} degrees</span>
+                {% elif delta <= -1 %}
+                <span class="text-sky-600">{{ delta }} degrees</span>
+                {% else %}
+                <span class="text-slate-500">{{ delta }} degrees</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-600">
+          <div class="flex flex-wrap gap-2 items-center">
+          <span class="px-3 py-1 bg-slate-100 rounded-full border border-slate-200 text-slate-600" id="history-page-indicator">Page {{ page }} of {{ total_pages }}</span>
+          <span class="px-3 py-1 bg-white rounded-full border border-slate-200 text-slate-500" id="history-rows-indicator">Showing {{ history|length }} rows</span>
+          <span class="px-3 py-1 bg-slate-50 rounded-full border border-slate-200 text-slate-400" id="history-total-indicator">Filtered {{ total_records }}</span>
+        </div>
+        <nav class="flex items-center gap-2">
+          <a id="history-prev" href="?room={{ room.name | urlencode }}&start={{ start }}&end={{ end }}&search={{ search | urlencode }}&per_page={{ per_page }}&page={{ page - 1 }}" class="px-4 py-2 rounded-lg bg-white text-slate-600 border border-slate-200 shadow hover:bg-slate-50 transition {% if page <= 1 %}opacity-40 pointer-events-none{% endif %}">Prev</a>
+          <a id="history-next" href="?room={{ room.name | urlencode }}&start={{ start }}&end={{ end }}&search={{ search | urlencode }}&per_page={{ per_page }}&page={{ page + 1 }}" class="px-4 py-2 rounded-lg bg-white text-slate-600 border border-slate-200 shadow hover:bg-slate-50 transition {% if page >= total_pages %}opacity-40 pointer-events-none{% endif %}">Next</a>
+        </nav>
+      </div>
+    </section>
+    <!-- <footer class="text-slate-500 text-sm py-6 text-center border-t border-slate-200">
+      Dummy data only - replace with live feeds when ready.
+    </footer> -->
+  </div>
+  <script>
+    (function () {
+      const historyBody = document.getElementById("historyTableBody");
+      const filtersForm = document.getElementById("historyFilters");
+      const pageInput = document.getElementById("history-page");
+      const startInput = document.getElementById("start");
+      const endInput = document.getElementById("end");
+      const searchInput = document.getElementById("search");
+      const perPageSelect = document.getElementById("per_page");
+      const prevLink = document.getElementById("history-prev");
+      const nextLink = document.getElementById("history-next");
+      const pageIndicator = document.getElementById("history-page-indicator");
+      const rowsIndicator = document.getElementById("history-rows-indicator");
+      const totalIndicator = document.getElementById("history-total-indicator");
+      const last24Btn = document.getElementById("btn-last24");
+      const todayBtn = document.getElementById("btn-today");
+      const clearBtn = document.getElementById("btn-clear-dates");
+      const roomName = {{ room.name | tojson }};
+
+      if (!historyBody || !filtersForm) {
+        return;
+      }
+
+      const targetTemp = {{ target_temp | default(0, true) }};
+      const state = {
+        page: Number(pageInput && pageInput.value) || 1,
+        per_page: Number(perPageSelect && perPageSelect.value) || 10,
+        start: (startInput && startInput.value) || "",
+        end: (endInput && endInput.value) || "",
+        search: (searchInput && searchInput.value) || "",
+      };
+      let currentTotal = {{ total_records | default(0) }};
+
+      const formatDateInput = (dt) => {
+        const pad = (n) => String(n).padStart(2, "0");
+        return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+      };
+
+      const syncInputs = () => {
+        if (startInput) startInput.value = state.start;
+        if (endInput) endInput.value = state.end;
+        if (searchInput) searchInput.value = state.search;
+        if (perPageSelect) perPageSelect.value = state.per_page;
+      };
+
+      const formatTimeLabel = (value) => {
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) {
+          return value || "";
+        }
+        return new Intl.DateTimeFormat("en-GB", {
+          day: "2-digit",
+          month: "short",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        }).format(date);
+      };
+
+      const renderRows = (rows) => {
+        if (!rows || !rows.length) {
+          return '<tr><td colspan="4" class="px-4 py-4 text-center text-slate-500">No readings for this filter.</td></tr>';
+        }
+        return rows
+          .map((row) => {
+            const temperature = Number(row.temperature ?? 0);
+            const humidityValue = row.humidity;
+            const delta = Number((temperature - targetTemp).toFixed(1));
+            const deltaClass = delta >= 1 ? "text-emerald-600" : delta <= -1 ? "text-sky-600" : "text-slate-500";
+            const deltaLabel = `${delta >= 0 ? "+" : ""}${delta.toFixed(1)} degrees`;
+            const humidityLabel = humidityValue == null ? "-" : `${humidityValue}%`;
+            return `
+<tr class="hover:bg-slate-100">
+  <td class="px-4 py-3 text-slate-900">${formatTimeLabel(row.timestamp)}</td>
+  <td class="px-4 py-3 font-semibold text-slate-900">${temperature.toFixed(1)} degrees C</td>
+  <td class="px-4 py-3 font-semibold text-slate-900">${humidityLabel}</td>
+  <td class="px-4 py-3"><span class="${deltaClass}">${deltaLabel}</span></td>
+</tr>`;
+          })
+          .join("");
+      };
+
+      const updatePaginationUI = (totalRows, currentCount) => {
+        const totalPages = Math.max(1, Math.ceil(totalRows / state.per_page));
+        if (pageIndicator) {
+          pageIndicator.textContent = `Page ${state.page} of ${totalPages}`;
+        }
+        if (rowsIndicator) {
+          rowsIndicator.textContent = `Showing ${currentCount} rows`;
+        }
+        if (totalIndicator) {
+          totalIndicator.textContent = `Filtered ${totalRows}`;
+        }
+        if (pageInput) {
+          pageInput.value = String(state.page);
+        }
+        currentTotal = totalRows;
+        if (prevLink) {
+          const params = new URLSearchParams({
+            room: roomName,
+            start: state.start,
+            end: state.end,
+            search: state.search,
+            per_page: state.per_page,
+            page: Math.max(1, state.page - 1),
+          });
+          prevLink.setAttribute("href", `?${params}`);
+          prevLink.classList.toggle("opacity-40", state.page <= 1);
+          prevLink.classList.toggle("pointer-events-none", state.page <= 1);
+        }
+        if (nextLink) {
+          const params = new URLSearchParams({
+            room: roomName,
+            start: state.start,
+            end: state.end,
+            search: state.search,
+            per_page: state.per_page,
+            page: Math.min(totalPages, state.page + 1),
+          });
+          nextLink.setAttribute("href", `?${params}`);
+          nextLink.classList.toggle("opacity-40", state.page >= totalPages);
+          nextLink.classList.toggle("pointer-events-none", state.page >= totalPages);
+        }
+      };
+
+      const loadHistory = async () => {
+        try {
+          const params = new URLSearchParams({
+            room: roomName,
+            page: state.page,
+            per_page: state.per_page,
+            start: state.start,
+            end: state.end,
+            search: state.search,
+          });
+          const response = await fetch(`/api/temperature?${params}`);
+          if (!response.ok) {
+            throw new Error("Unable to load history");
+          }
+          const payload = await response.json();
+          historyBody.innerHTML = renderRows(payload.data);
+          updatePaginationUI(payload.total, payload.data.length);
+        } catch (error) {
+          console.error(error);
+        }
+      };
+
+      updatePaginationUI(currentTotal, {{ history|length }});
+
+      const goToPage = (value) => {
+        state.page = value;
+        loadHistory();
+      };
+
+      filtersForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        state.page = 1;
+        state.start = (startInput && startInput.value) || "";
+        state.end = (endInput && endInput.value) || "";
+        state.search = (searchInput && searchInput.value) || "";
+        loadHistory();
+      });
+
+      if (perPageSelect) {
+        perPageSelect.addEventListener("change", () => {
+          state.per_page = Number(perPageSelect.value) || 10;
+          state.page = 1;
+          loadHistory();
+        });
+      }
+
+      [startInput, endInput].forEach((input) => {
+        if (!input) {
+          return;
+        }
+        input.addEventListener("change", () => {
+          state.start = (startInput && startInput.value) || "";
+          state.end = (endInput && endInput.value) || "";
+          state.page = 1;
+          loadHistory();
+        });
+      });
+
+      if (searchInput) {
+        searchInput.addEventListener("keydown", (event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            state.search = searchInput.value || "";
+            state.page = 1;
+            loadHistory();
+          }
+        });
+      }
+
+      if (prevLink) {
+        prevLink.addEventListener("click", (event) => {
+          event.preventDefault();
+          if (state.page > 1) {
+            goToPage(state.page - 1);
+          }
+        });
+      }
+
+      if (nextLink) {
+        nextLink.addEventListener("click", (event) => {
+          event.preventDefault();
+          const totalPages = Math.max(1, Math.ceil(currentTotal / state.per_page));
+          if (state.page < totalPages) {
+            goToPage(state.page + 1);
+          }
+        });
+      }
+
+      if (last24Btn) {
+        last24Btn.addEventListener("click", () => {
+          const now = new Date();
+          const past = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+          state.start = formatDateInput(past);
+          state.end = formatDateInput(now);
+          state.page = 1;
+          syncInputs();
+          loadHistory();
+        });
+      }
+
+      if (todayBtn) {
+        todayBtn.addEventListener("click", () => {
+          const now = new Date();
+          const start = new Date(now);
+          start.setHours(0, 0, 0, 0);
+          state.start = formatDateInput(start);
+          state.end = formatDateInput(now);
+          state.page = 1;
+          syncInputs();
+          loadHistory();
+        });
+      }
+
+      if (clearBtn) {
+        clearBtn.addEventListener("click", () => {
+          state.start = "";
+          state.end = "";
+          state.page = 1;
+          syncInputs();
+          loadHistory();
+        });
+      }
+    })();
+  </script>
+</body>
+</html>
